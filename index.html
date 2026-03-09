@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>T'way Air · DEFER 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3352;
+    --text: #e2e8f0;
+    --muted: #8892b0;
+    --red: #ff4757;
+    --orange: #ff6348;
+    --yellow: #ffa502;
+    --blue: #1e90ff;
+    --green: #2ed573;
+    --purple: #a29bfe;
+    --cyan: #00cec9;
+    --tway: #e8192c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  /* ── 헤더 ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    background: var(--surface);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    background: var(--tway);
+    color: #fff;
+    font-weight: 900;
+    font-size: 17px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+  .title { font-size: 19px; font-weight: 700; }
+  .subtitle { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .header-right { text-align: right; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .header-right strong { display: block; font-size: 20px; font-weight: 800; color: var(--text); }
+
+  /* ── 파일 선택 영역 ── */
+  .upload-zone {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    padding: 44px 20px;
+    text-align: center;
+    margin-bottom: 16px;
+    transition: border-color .2s, background .2s;
+    cursor: pointer;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--tway);
+    background: rgba(232,25,44,.06);
+  }
+  .upload-zone .uz-icon { font-size: 52px; margin-bottom: 14px; }
+  .upload-zone .uz-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .upload-zone .uz-hint { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .file-input { display: none; }
+  .btn-select {
+    margin-top: 18px;
+    background: var(--tway);
+    color: #fff;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 9px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .2s;
+    display: inline-block;
+  }
+  .btn-select:hover { opacity: .85; }
+
+  /* 파일 선택 후 상태 */
+  .file-status {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 18px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .file-name { font-weight: 700; color: var(--green); }
+  .btn-reload {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-reload:hover { border-color: var(--tway); color: var(--tway); }
+
+  /* ── 요약 카드 ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 1000px) { .summary-grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 600px)  { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 12px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .15s, border-color .15s;
+  }
+  .stat-card:hover { transform: translateY(-2px); }
+  .stat-card.active { border-color: currentColor; }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .stat-card.s-overdue::before  { background: var(--red); }
+  .stat-card.s-critical::before { background: var(--orange); }
+  .stat-card.s-warning::before  { background: var(--yellow); }
+  .stat-card.s-caution::before  { background: var(--blue); }
+  .stat-card.s-mel::before      { background: var(--cyan); }
+  .stat-card.s-cdlnef::before   { background: var(--purple); }
+  .stat-card.s-total::before    { background: var(--green); }
+
+  .stat-num { font-size: 30px; font-weight: 800; line-height: 1.1; }
+  .s-overdue  .stat-num { color: var(--red); }
+  .s-critical .stat-num { color: var(--orange); }
+  .s-warning  .stat-num { color: var(--yellow); }
+  .s-caution  .stat-num { color: var(--blue); }
+  .s-mel      .stat-num { color: var(--cyan); }
+  .s-cdlnef   .stat-num { color: var(--purple); }
+  .s-total    .stat-num { color: var(--green); }
+  .stat-label { font-size: 10px; color: var(--muted); margin-top: 4px; font-weight: 700; letter-spacing: .4px; }
+  .stat-sub   { font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+  /* ── 탭 ── */
+  .tab-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 18px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color .15s, border-color .15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--tway); }
+  .tab-count {
+    display: inline-block;
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 11px;
+    margin-left: 5px;
+  }
+
+  /* ── 필터 바 ── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-bar input, .filter-bar select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 13px;
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+  }
+  .filter-bar input { flex: 1; min-width: 200px; }
+  .filter-bar input:focus, .filter-bar select:focus { border-color: var(--blue); }
+  .filter-count { font-size: 12px; color: var(--muted); margin-left: 6px; }
+  .btn-reset {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 9px 13px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .btn-reset:hover { color: var(--text); }
+
+  /* ── 테이블 ── */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 920px; }
+  thead tr { background: var(--surface2); border-bottom: 2px solid var(--border); }
+  th {
+    padding: 11px 14px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  th:hover { color: var(--text); }
+  th.sorted { color: var(--blue); }
+
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 11px 14px; vertical-align: middle; }
+
+  /* 긴급도 좌측 바 */
+  tbody tr.u-overdue  td:first-child { border-left: 3px solid var(--red); }
+  tbody tr.u-critical td:first-child { border-left: 3px solid var(--orange); }
+  tbody tr.u-warning  td:first-child { border-left: 3px solid var(--yellow); }
+  tbody tr.u-caution  td:first-child { border-left: 3px solid var(--blue); }
+  tbody tr.u-normal   td:first-child { border-left: 3px solid #2e3352; }
+
+  /* 배지 */
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .b-overdue  { background: rgba(255,71,87,.15);  color: var(--red);    border: 1px solid rgba(255,71,87,.3); }
+  .b-critical { background: rgba(255,99,72,.15);  color: var(--orange); border: 1px solid rgba(255,99,72,.3); }
+  .b-warning  { background: rgba(255,165,2,.15);  color: var(--yellow); border: 1px solid rgba(255,165,2,.3); }
+  .b-caution  { background: rgba(30,144,255,.15); color: var(--blue);   border: 1px solid rgba(30,144,255,.3); }
+  .b-normal   { background: rgba(46,213,115,.12); color: var(--green);  border: 1px solid rgba(46,213,115,.3); }
+
+  /* CAT 배지 (MEL: A/B/C/D) */
+  .b-cat-A { background: rgba(255,71,87,.15);  color: var(--red);    border: 1px solid rgba(255,71,87,.3);  padding:2px 7px; border-radius:5px; font-size:11px; font-weight:700; }
+  .b-cat-B { background: rgba(255,99,72,.15);  color: var(--orange); border: 1px solid rgba(255,99,72,.3);  padding:2px 7px; border-radius:5px; font-size:11px; font-weight:700; }
+  .b-cat-C { background: rgba(255,165,2,.15);  color: var(--yellow); border: 1px solid rgba(255,165,2,.3);  padding:2px 7px; border-radius:5px; font-size:11px; font-weight:700; }
+  .b-cat-D { background: rgba(46,213,115,.12); color: var(--green);  border: 1px solid rgba(46,213,115,.3); padding:2px 7px; border-radius:5px; font-size:11px; font-weight:700; }
+  /* CDL/NEF 배지 */
+  .b-cat-CDL { background: rgba(162,155,254,.14); color: var(--purple); border: 1px solid rgba(162,155,254,.3); padding:2px 7px; border-radius:5px; font-size:11px; font-weight:700; }
+  .b-cat-NEF { background: rgba(0,206,201,.12);   color: var(--cyan);   border: 1px solid rgba(0,206,201,.3);   padding:2px 7px; border-radius:5px; font-size:11px; font-weight:700; }
+  /* 시트 구분 배지 */
+  .b-sheet-mel    { background: rgba(0,206,201,.1);   color: var(--cyan);   border: 1px solid rgba(0,206,201,.25);   padding:1px 6px; border-radius:4px; font-size:10px; }
+  .b-sheet-cdlnef { background: rgba(162,155,254,.1); color: var(--purple); border: 1px solid rgba(162,155,254,.25); padding:1px 6px; border-radius:4px; font-size:10px; }
+
+  /* D-DAY */
+  .days-big  { font-size: 17px; font-weight: 800; }
+  .days-unit { font-size: 11px; color: var(--muted); margin-left: 2px; }
+  .days-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .ac-reg  { font-weight: 700; font-size: 13px; letter-spacing: .3px; }
+  .ac-type { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .desc-cell { max-width: 260px; }
+  .desc-text {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.45;
+    font-size: 12px;
+  }
+  .flight-text { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .remark-cell {
+    max-width: 170px;
+    font-size: 11px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .table-footer {
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* 빈 상태 */
+  .empty-state {
+    text-align: center;
+    padding: 70px 20px;
+    color: var(--muted);
+  }
+  .empty-state .big-icon { font-size: 52px; margin-bottom: 14px; }
+
+  /* hidden 유틸 */
+  .hidden { display: none !important; }
+
+  /* 스크롤바 */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3d4570; }
+</style>
+</head>
+<body>
+
+<!-- ── 헤더 ── -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">T'WAY</div>
+    <div>
+      <div class="title">✈ DEFER 현황 대시보드</div>
+      <div class="subtitle">MCC · 정비이월 현황 (MEL + CDL/NEF) · CLOSE DATE 미기입 항목 자동 필터</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <strong id="totalCount">—</strong>
+    OPEN ITEMS
+    <div style="margin-top:3px">기준: <span id="asOf">—</span></div>
+    <div>로드: <span id="loadTime">—</span></div>
+  </div>
+</div>
+
+<!-- ── 파일 선택 ── -->
+<div class="upload-zone" id="uploadZone"
+     onclick="document.getElementById('fileInput').click()">
+  <div class="uz-icon">📂</div>
+  <div class="uz-title">DEFER Excel 파일을 여기에 드래그하거나 클릭하세요</div>
+  <div class="uz-hint">
+    OneDrive 경로에서 직접 선택 가능<br>
+    <code style="background:rgba(255,255,255,.07);padding:3px 8px;border-radius:4px;font-size:12px">
+      C:\Users\twayair\OneDrive - 티웨이항공\티웨이항공 - DEFER - DEFER\정비이월_DEFER_현황__MASTER_.xlsx
+    </code>
+  </div>
+  <button class="btn-select"
+          onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
+    📁 파일 선택하기
+  </button>
+  <input type="file" id="fileInput" class="file-input"
+         accept=".xlsx,.xls"
+         onchange="loadFile(this.files[0])">
+</div>
+
+<!-- 파일 상태 바 -->
+<div class="file-status hidden" id="fileStatus">
+  <div>
+    <span style="color:var(--muted);font-size:11px">📄 현재 파일:</span>&nbsp;
+    <span class="file-name" id="fileName">—</span>
+  </div>
+  <button class="btn-reload"
+          onclick="document.getElementById('fileInput').click()">
+    🔄 다른 파일 선택
+  </button>
+</div>
+
+<!-- ── 요약 카드 ── -->
+<div class="summary-grid hidden" id="summaryGrid">
+  <div class="stat-card s-overdue" onclick="setUrgencyFilter('overdue')" title="클릭하면 필터">
+    <div class="stat-num" id="cnt-overdue">0</div>
+    <div class="stat-label">🔴 1일 이내</div>
+    <div class="stat-sub">기한 초과 포함</div>
+  </div>
+  <div class="stat-card s-critical" onclick="setUrgencyFilter('critical')" title="클릭하면 필터">
+    <div class="stat-num" id="cnt-critical">0</div>
+    <div class="stat-label">🟠 3일 이내</div>
+    <div class="stat-sub">긴급</div>
+  </div>
+  <div class="stat-card s-warning" onclick="setUrgencyFilter('warning')" title="클릭하면 필터">
+    <div class="stat-num" id="cnt-warning">0</div>
+    <div class="stat-label">🟡 5일 이내</div>
+    <div class="stat-sub">경고</div>
+  </div>
+  <div class="stat-card s-caution" onclick="setUrgencyFilter('caution')" title="클릭하면 필터">
+    <div class="stat-num" id="cnt-caution">0</div>
+    <div class="stat-label">🔵 10일 이내</div>
+    <div class="stat-sub">주의</div>
+  </div>
+  <div class="stat-card s-mel" onclick="setSheetFilter('MEL')" title="클릭하면 MEL만 보기">
+    <div class="stat-num" id="cnt-mel">0</div>
+    <div class="stat-label">🔹 MEL</div>
+    <div class="stat-sub">정비이월(DEFER)</div>
+  </div>
+  <div class="stat-card s-cdlnef" onclick="setSheetFilter('CDL/NEF')" title="클릭하면 CDL/NEF만 보기">
+    <div class="stat-num" id="cnt-cdlnef">0</div>
+    <div class="stat-label">🔷 CDL/NEF</div>
+    <div class="stat-sub">정비이월(CDL,NEF)</div>
+  </div>
+  <div class="stat-card s-total" onclick="resetFilters()" title="클릭하면 전체 보기">
+    <div class="stat-num" id="cnt-total">0</div>
+    <div class="stat-label">🟢 전체 OPEN</div>
+    <div class="stat-sub">클릭: 전체 보기</div>
+  </div>
+</div>
+
+<!-- ── 탭 ── -->
+<div class="tab-bar hidden" id="tabBar">
+  <button class="tab-btn active" onclick="setTab('all')" id="tab-all">
+    전체 <span class="tab-count" id="tab-cnt-all">0</span>
+  </button>
+  <button class="tab-btn" onclick="setTab('MEL')" id="tab-MEL">
+    ✈ MEL (정비이월) <span class="tab-count" id="tab-cnt-MEL">0</span>
+  </button>
+  <button class="tab-btn" onclick="setTab('CDL/NEF')" id="tab-CDL/NEF">
+    🔧 CDL / NEF <span class="tab-count" id="tab-cnt-CDL/NEF">0</span>
+  </button>
+</div>
+
+<!-- ── 필터 바 ── -->
+<div class="filter-bar hidden" id="filterBar">
+  <input type="text" id="searchInput"
+         placeholder="🔍  항공기 등록번호, 결함내용, MEL/CDL NO 검색..."
+         oninput="applyFilters()">
+  <select id="filterUrgency" onchange="applyFilters()">
+    <option value="">전체 긴급도</option>
+    <option value="overdue">🔴 1일 이내 (기한 초과)</option>
+    <option value="critical">🟠 3일 이내</option>
+    <option value="warning">🟡 5일 이내</option>
+    <option value="caution">🔵 10일 이내</option>
+    <option value="normal">🟢 여유 (11일+)</option>
+  </select>
+  <select id="filterType" onchange="applyFilters()">
+    <option value="">전체 기종</option>
+  </select>
+  <select id="filterCat" onchange="applyFilters()">
+    <option value="">전체 CAT</option>
+  </select>
+  <button class="btn-reset" onclick="resetFilters()">✕ 초기화</button>
+  <span class="filter-count" id="filterCount"></span>
+</div>
+
+<!-- ── 테이블 ── -->
+<div class="table-wrap">
+  <table>
+    <thead id="tableHead" class="hidden">
+      <tr>
+        <th onclick="sortBy('daysLeft')" id="th-daysLeft" class="sorted">D-DAY ▲</th>
+        <th onclick="sortBy('ac')"       id="th-ac">항공기 ↕</th>
+        <th onclick="sortBy('cat')"      id="th-cat">CAT ↕</th>
+        <th onclick="sortBy('melNo')"    id="th-melNo">MEL/CDL NO ↕</th>
+        <th>결함 내용</th>
+        <th onclick="sortBy('openDate')" id="th-openDate">OPEN DATE ↕</th>
+        <th>입고/진행 현황</th>
+        <th>REMARK</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="8">
+        <div class="empty-state">
+          <div class="big-icon">📋</div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:8px">DEFER 파일을 선택해주세요</div>
+          <div style="font-size:13px">위의 파일 선택 버튼을 눌러 Excel 파일을 불러오세요</div>
+        </div>
+      </td></tr>
+    </tbody>
+  </table>
+  <div class="table-footer hidden" id="tableFooter">
+    <span id="footerLeft">—</span>
+    <span id="footerRight">T'way Air MCC DEFER Dashboard</span>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// 열 인덱스 정의 (0-based, 각 시트별)
+// ══════════════════════════════════════════════
+const COL_MEL = {
+  // 시트: 정비이월(DEFER)현황
+  SEC:0, NO:1, TYPE:2, AC:3, DESC:4, FLIGHT:5,
+  MEL_NO:6, CAT:7, AUTO_LAND:8, REPEAT:9, SEAT:10,
+  OPEN_DATE:11, DUE_DATE:12, CLOSE_DATE:13,
+  PART_NO:14, PART_NAME:15, REQ_DATE:16,
+  INBOUND_STATUS:17,   // R열: 입고 예정일 및 현황
+  REMARK:18,           // S열: REMARK
+  DUTY_MGR:19,
+};
+const COL_CDL = {
+  // 시트: 정비이월(CDL,NEF)현황
+  SEC:0, NO:1, TYPE:2, AC:3, DESC:4, FLIGHT:5,
+  MEL_NO:6, CAT:7, REPEAT:8, SEAT:9,
+  OPEN_DATE:10, DUE_DATE:11, CLOSE_DATE:12,
+  PART_NO:13, PART_NAME:14, REQ_DATE:15,
+  INBOUND_STATUS:16,   // Q열: 입고 예정일 및 현황
+  REMARK:17,           // R열: REMARK
+  DUTY_MGR:18,
+};
+
+// ══════════════════════════════════════════════
+// 상태 변수
+// ══════════════════════════════════════════════
+let allItems = [];
+let currentTab  = 'all';
+let currentSort = { key: 'daysLeft', asc: true };
+
+// ══════════════════════════════════════════════
+// 드래그 앤 드롭
+// ══════════════════════════════════════════════
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
+
+// ══════════════════════════════════════════════
+// 파일 로드
+// ══════════════════════════════════════════════
+function loadFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      // cellDates:true → 날짜 셀을 JS Date 객체로 직접 읽음 (가장 신뢰성 높음)
+      const wb = XLSX.read(ev.target.result, {
+        type: 'array', cellDates: true
+      });
+
+      // As of 날짜: 첫 번째 시트 1행 C열(idx 2)
+      const ws0 = wb.Sheets[wb.SheetNames[0]];
+      const raw0 = XLSX.utils.sheet_to_json(ws0, { header:1, raw:true, cellDates:true });
+      const asOfRaw = raw0[0] && raw0[0][2];
+      const asOfVal = asOfRaw instanceof Date ? fmtDate(asOfRaw) : '—';
+      document.getElementById('asOf').textContent = asOfVal;
+
+      // 각 시트 파싱
+      const melItems    = parseSheet(wb, '정비이월(DEFER)현황',   COL_MEL, 'MEL');
+      const cdlNefItems = parseSheet(wb, '정비이월(CDL,NEF)현황', COL_CDL, 'CDL/NEF');
+      allItems = [...melItems, ...cdlNefItems];
+
+      // DUE DATE 오름차순 기본 정렬
+      sortItems(allItems);
+
+      // UI 표시
+      document.getElementById('uploadZone').classList.add('hidden');
+      document.getElementById('fileStatus').classList.remove('hidden');
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('loadTime').textContent = new Date().toLocaleTimeString('ko-KR');
+      document.getElementById('totalCount').textContent = allItems.length;
+
+      ['summaryGrid','tabBar','filterBar','tableHead','tableFooter'].forEach(id => {
+        document.getElementById(id).classList.remove('hidden');
+      });
+
+      // 탭 카운트
+      document.getElementById('tab-cnt-all').textContent    = allItems.length;
+      document.getElementById('tab-cnt-MEL').textContent    = melItems.length;
+      document.getElementById('tab-cnt-CDL/NEF').textContent = cdlNefItems.length;
+
+      populateFilters();
+      updateSummary(allItems);
+      applyFilters();
+
+    } catch (err) {
+      alert('파일 읽기 오류:\n' + err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══════════════════════════════════════════════
+// 시트 파싱
+// ══════════════════════════════════════════════
+// ── 날짜 유틸 ──
+// SheetJS cellDates:true 일 때 Date 객체, 아니면 null
+function getDate(val) {
+  if (!val && val !== 0) return null;
+  if (val instanceof Date) return isNaN(val) ? null : val;
+  // 숫자(Excel 시리얼): 1보다 큰 경우만 유효한 날짜로 간주
+  if (typeof val === 'number' && val > 1) {
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return isNaN(d) ? null : d;
+  }
+  // 문자열 날짜 시도
+  if (typeof val === 'string' && val.trim()) {
+    const d = new Date(val.trim());
+    return isNaN(d) ? null : d;
+  }
+  return null;
+}
+
+function fmtDate(d) {
+  if (!d || !(d instanceof Date) || isNaN(d)) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function strVal(val) {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date) return fmtDate(val);
+  return String(val).replace(/\r?\n/g,' ').trim();
+}
+
+function parseSheet(wb, sheetName, COL, sheetType) {
+  const ws = wb.Sheets[sheetName];
+  if (!ws) { console.warn('시트 없음:', sheetName); return []; }
+
+  // raw:true + cellDates:true → 날짜는 Date 객체, 나머지는 원시값으로 읽음
+  // → CLOSE DATE 가 진짜 비어있는지 정확하게 판단 가능
+  const rows = XLSX.utils.sheet_to_json(ws, {
+    header: 1, raw: true, cellDates: true
+  });
+
+  const now = new Date();
+  const items = [];
+
+  for (let i = 2; i < rows.length; i++) {   // 3행(index 2)부터
+    const row = rows[i];
+    if (!row || row.length < 4) continue;
+
+    const ac   = strVal(row[COL.AC]);
+    const desc = strVal(row[COL.DESC]);
+    if (!ac && !desc) continue;   // 완전 빈 행 skip
+
+    // ── CLOSE DATE 체크 ──
+    // getDate()가 null 이 아니면 → 날짜 값이 있음 → CLOSED → skip
+    const closeDate = getDate(row[COL.CLOSE_DATE]);
+    if (closeDate !== null) continue;
+
+    // 추가 방어: 문자열로 뭔가 적혀있어도 CLOSED 처리
+    const closeStr = strVal(row[COL.CLOSE_DATE]);
+    if (closeStr && closeStr !== '' && closeStr !== '0') continue;
+
+    // ── DUE DATE ──
+    const dueDateObj = getDate(row[COL.DUE_DATE]);
+    const dueDateStr = fmtDate(dueDateObj);
+    let daysLeft = null;
+    let urgency  = 'normal';
+
+    if (dueDateObj) {
+      daysLeft = Math.ceil((dueDateObj - now) / 86400000);
+      if      (daysLeft <= 1)  urgency = 'overdue';
+      else if (daysLeft <= 3)  urgency = 'critical';
+      else if (daysLeft <= 5)  urgency = 'warning';
+      else if (daysLeft <= 10) urgency = 'caution';
+      else                     urgency = 'normal';
+    }
+
+    items.push({
+      sheetType,
+      no:           strVal(row[COL.NO]),
+      type:         strVal(row[COL.TYPE]),
+      ac,
+      desc,
+      flight:       strVal(row[COL.FLIGHT]),
+      melNo:        strVal(row[COL.MEL_NO]),
+      cat:          strVal(row[COL.CAT]),
+      openDate:     fmtDate(getDate(row[COL.OPEN_DATE])) || strVal(row[COL.OPEN_DATE]),
+      dueDate:      dueDateStr,
+      daysLeft,
+      urgency,
+      inboundStatus: strVal(row[COL.INBOUND_STATUS]),
+      remark:        strVal(row[COL.REMARK]),
+      dutyMgr:       strVal(row[COL.DUTY_MGR]),
+    });
+  }
+  return items;
+}
+
+// ══════════════════════════════════════════════
+// 필터 옵션 생성
+// ══════════════════════════════════════════════
+function populateFilters() {
+  // 기종
+  const types = [...new Set(allItems.map(d => d.type).filter(Boolean))].sort();
+  const tSel = document.getElementById('filterType');
+  tSel.innerHTML = '<option value="">전체 기종</option>';
+  types.forEach(t => { const o = document.createElement('option'); o.value=t; o.textContent=t; tSel.appendChild(o); });
+
+  // CAT
+  const cats = [...new Set(allItems.map(d => d.cat).filter(Boolean))].sort();
+  const cSel = document.getElementById('filterCat');
+  cSel.innerHTML = '<option value="">전체 CAT</option>';
+  cats.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; cSel.appendChild(o); });
+}
+
+// ══════════════════════════════════════════════
+// 요약 카드
+// ══════════════════════════════════════════════
+function updateSummary(items) {
+  const c = { overdue:0, critical:0, warning:0, caution:0, normal:0 };
+  let mel=0, cdlnef=0;
+  items.forEach(d => {
+    c[d.urgency] = (c[d.urgency]||0) + 1;
+    if (d.sheetType === 'MEL') mel++;
+    else cdlnef++;
+  });
+  document.getElementById('cnt-overdue').textContent  = c.overdue;
+  document.getElementById('cnt-critical').textContent = c.critical;
+  document.getElementById('cnt-warning').textContent  = c.warning;
+  document.getElementById('cnt-caution').textContent  = c.caution;
+  document.getElementById('cnt-mel').textContent      = mel;
+  document.getElementById('cnt-cdlnef').textContent   = cdlnef;
+  document.getElementById('cnt-total').textContent    = items.length;
+}
+
+// ══════════════════════════════════════════════
+// 탭 전환
+// ══════════════════════════════════════════════
+function setTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  applyFilters();
+}
+
+// ══════════════════════════════════════════════
+// 카드 클릭 필터
+// ══════════════════════════════════════════════
+function setUrgencyFilter(urgency) {
+  document.getElementById('filterUrgency').value = urgency;
+  applyFilters();
+}
+function setSheetFilter(sheet) {
+  setTab(sheet);
+}
+function resetFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterUrgency').value = '';
+  document.getElementById('filterType').value = '';
+  document.getElementById('filterCat').value = '';
+  setTab('all');
+}
+
+// ══════════════════════════════════════════════
+// 필터 적용
+// ══════════════════════════════════════════════
+function applyFilters() {
+  const search  = document.getElementById('searchInput').value.toLowerCase();
+  const urgency = document.getElementById('filterUrgency').value;
+  const type    = document.getElementById('filterType').value;
+  const cat     = document.getElementById('filterCat').value;
+
+  let filtered = allItems.filter(d => {
+    if (currentTab !== 'all' && d.sheetType !== currentTab) return false;
+    if (urgency && d.urgency !== urgency) return false;
+    if (type    && d.type    !== type)    return false;
+    if (cat     && d.cat     !== cat)     return false;
+    if (search) {
+      const hay = `${d.ac} ${d.type} ${d.desc} ${d.melNo} ${d.flight} ${d.remark} ${d.inboundStatus}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  sortItems(filtered);
+  renderTable(filtered);
+  document.getElementById('filterCount').textContent = `${filtered.length}개 표시 중`;
+}
+
+// ══════════════════════════════════════════════
+// 정렬
+// ══════════════════════════════════════════════
+function sortBy(key) {
+  if (currentSort.key === key) currentSort.asc = !currentSort.asc;
+  else currentSort = { key, asc: true };
+
+  document.querySelectorAll('th[id^="th-"]').forEach(th => {
+    th.classList.remove('sorted');
+    th.textContent = th.textContent.replace(/ [▲▼↕]$/, '') + ' ↕';
+  });
+  const th = document.getElementById('th-' + key);
+  if (th) {
+    th.classList.add('sorted');
+    th.textContent = th.textContent.replace(/ [▲▼↕]$/, '') + (currentSort.asc ? ' ▲' : ' ▼');
+  }
+  applyFilters();
+}
+
+function sortItems(items) {
+  const { key, asc } = currentSort;
+  items.sort((a, b) => {
+    if (key === 'daysLeft') {
+      if (a.daysLeft === null && b.daysLeft === null) return 0;
+      if (a.daysLeft === null) return 1;
+      if (b.daysLeft === null) return -1;
+      return asc ? a.daysLeft - b.daysLeft : b.daysLeft - a.daysLeft;
+    }
+    const va = String(a[key]||'').toLowerCase();
+    const vb = String(b[key]||'').toLowerCase();
+    return asc ? va.localeCompare(vb,'ko') : vb.localeCompare(va,'ko');
+  });
+}
+
+// ══════════════════════════════════════════════
+// 테이블 렌더링
+// ══════════════════════════════════════════════
+const URGENCY_COLOR = {
+  overdue:'var(--red)', critical:'var(--orange)',
+  warning:'var(--yellow)', caution:'var(--blue)', normal:'var(--green)'
+};
+const URGENCY_EMOJI = { overdue:'🔴', critical:'🟠', warning:'🟡', caution:'🔵', normal:'🟢' };
+
+function renderTable(items) {
+  const tbody = document.getElementById('tableBody');
+
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="8">
+      <div class="empty-state">
+        <div class="big-icon">✅</div>
+        <div style="font-size:14px;font-weight:600">해당 조건의 OPEN DEFER 항목이 없습니다</div>
+      </div>
+    </td></tr>`;
+    document.getElementById('footerLeft').textContent = '0개 항목';
+    return;
+  }
+
+  tbody.innerHTML = items.map(d => {
+    const col   = URGENCY_COLOR[d.urgency];
+    const emoji = URGENCY_EMOJI[d.urgency];
+    const isOver = d.daysLeft !== null && d.daysLeft <= 0;
+
+    // D-DAY 셀
+    let daysBadge, daysDetail;
+    if (d.daysLeft === null) {
+      daysBadge  = `<span class="badge b-${d.urgency}">— DUE 미정</span>`;
+      daysDetail = `<div style="margin-top:6px;font-size:11px;color:var(--muted)">DUE DATE 없음</div>`;
+    } else if (isOver) {
+      daysBadge  = `<span class="badge b-${d.urgency}">${emoji} ${Math.abs(d.daysLeft)}일 초과</span>`;
+      daysDetail = `<div style="margin-top:6px">
+        <span class="days-big" style="color:${col}">${Math.abs(d.daysLeft)}</span>
+        <span class="days-unit">일 초과</span>
+      </div>
+      <div class="days-sub">${esc(d.dueDate)}</div>`;
+    } else {
+      daysBadge  = `<span class="badge b-${d.urgency}">${emoji} D-${d.daysLeft}</span>`;
+      daysDetail = `<div style="margin-top:6px">
+        <span class="days-big" style="color:${col}">${d.daysLeft}</span>
+        <span class="days-unit">일 남음</span>
+      </div>
+      <div class="days-sub">${esc(d.dueDate)}</div>`;
+    }
+
+    // CAT 배지
+    const catBadge = `<span class="b-cat-${d.cat}">${esc(d.cat)||'—'}</span>`;
+
+    // 시트 구분 배지
+    const sheetBadge = d.sheetType === 'MEL'
+      ? `<span class="b-sheet-mel">MEL</span>`
+      : `<span class="b-sheet-cdlnef">CDL/NEF</span>`;
+
+    return `
+    <tr class="u-${d.urgency}">
+      <td>${daysBadge}${daysDetail}</td>
+      <td>
+        <div class="ac-reg">${esc(d.ac)}</div>
+        <div class="ac-type">${esc(d.type)}</div>
+        <div style="margin-top:4px">${sheetBadge}</div>
+      </td>
+      <td>${catBadge}</td>
+      <td style="font-family:monospace;font-size:12px;max-width:130px;word-break:break-all">${esc(d.melNo)||'—'}</td>
+      <td class="desc-cell">
+        <div class="desc-text" title="${esc(d.desc)}">${esc(d.desc)}</div>
+        <div class="flight-text">${esc(d.flight)}</div>
+      </td>
+      <td style="font-size:12px;color:var(--muted);white-space:nowrap">${esc(d.openDate)}</td>
+      <td class="remark-cell" title="${esc(d.inboundStatus)}">${esc(d.inboundStatus)||'—'}</td>
+      <td class="remark-cell" title="${esc(d.remark)}">${esc(d.remark)||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('footerLeft').textContent  = `총 ${items.length}개 OPEN 항목`;
+  document.getElementById('footerRight').textContent = `기준: ${document.getElementById('asOf').textContent}`;
+}
+
+function esc(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
